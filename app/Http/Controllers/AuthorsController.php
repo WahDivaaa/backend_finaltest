@@ -6,91 +6,93 @@ use App\Models\Authors;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 class AuthorsController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
     public function index(Request $request)
     {
         $sorting = $request->input('sorting', 'popularity');
         $keyword = $request->input('keyword');
 
-        $cacheTTL = now()->addMinutes(10);
-        $cacheKey = 'authors.index.' . $sorting . '.' . md5($keyword ?? '');
+        $cacheKey = 'authors_index_sort_' . $sorting . '_keyword_' . $keyword;
+        $cacheTTL = 600; // 10 menit
 
-        // Cache hanya data, bukan view
         $authors = Cache::remember($cacheKey, $cacheTTL, function () use ($sorting, $keyword) {
-            $now = Carbon::now();
-            $recentStart = $now->copy()->subDays(30);
-            $lastStart = $now->copy()->subDays(60);
-
-            $query = Authors::query()
-                ->select('authors.id', 'authors.name')
-                ->addSelect([
-                    'total_ratings_count' => function ($q) {
-                        $q->selectRaw('COUNT(ratings.id)')
-                            ->from('ratings')
-                            ->join('books', 'ratings.book_id', '=', 'books.id')
-                            ->whereColumn('books.author_id', 'authors.id');
-                    },
-                    'overall_avg_rating' => function ($q) {
-                        $q->selectRaw('AVG(ratings.rate)')
-                            ->from('ratings')
-                            ->join('books', 'ratings.book_id', '=', 'books.id')
-                            ->whereColumn('books.author_id', 'authors.id');
-                    },
-                    'popularity_count' => function ($q) {
-                        $q->selectRaw('COUNT(ratings.id)')
-                            ->from('ratings')
-                            ->join('books', 'ratings.book_id', '=', 'books.id')
-                            ->whereColumn('books.author_id', 'authors.id')
-                            ->where('ratings.rate', '>', 5);
-                    },
-                ])
-                ->selectRaw("
-                COALESCE((( 
-                    (SELECT AVG(ratings.rate) FROM ratings 
-                     INNER JOIN books ON ratings.book_id = books.id 
-                     WHERE books.author_id = authors.id AND ratings.created_at >= ?) - 
-                    (SELECT AVG(ratings.rate) FROM ratings 
-                     INNER JOIN books ON ratings.book_id = books.id 
-                     WHERE books.author_id = authors.id AND ratings.created_at BETWEEN ? AND ?)
-                ) *
-                (SELECT COUNT(ratings.id) FROM ratings 
-                 INNER JOIN books ON ratings.book_id = books.id 
-                 WHERE books.author_id = authors.id AND ratings.created_at >= ?)), 0) as trending_score
-            ", [$recentStart, $lastStart, $recentStart, $recentStart]);
-
-            switch ($sorting) {
-                case 'average_rating':
-                    $query->orderByDesc('overall_avg_rating');
-                    break;
-                case 'trending':
-                    $query->orderByDesc('trending_score');
-                    break;
-                default:
-                    $query->orderByDesc('popularity_count');
-                    break;
-            }
-
-            return $query->take(20)->get();
+            return $this->getAuthorsQuery($sorting, $keyword)->get();
         });
-
-        // Render view di luar cache
         return view('author', compact('authors', 'sorting'));
+    }
+
+    private function getAuthorsQuery($sorting, $keyword = null)
+    {
+        $now = Carbon::now();
+        $recentStart = $now->copy()->subDays(30)->toDateTimeString();
+        $lastStart = $now->copy()->subDays(60)->toDateTimeString();
+
+        $query = Authors::query()
+            ->select([
+                'authors.id',
+                'authors.name',
+                DB::raw('COUNT(DISTINCT r.id) as total_ratings_count'),
+                DB::raw('COALESCE(AVG(r.rate), 0) as overall_avg_rating'),
+                DB::raw('COUNT(DISTINCT CASE WHEN r.rate > 5 THEN r.id END) as popularity_count'),
+                DB::raw("COALESCE(
+                    (AVG(CASE WHEN r.created_at >= ? THEN r.rate END) - AVG(CASE WHEN r.created_at BETWEEN ? AND ? THEN r.rate END)) *
+                    COUNT(DISTINCT CASE WHEN r.created_at >= ? THEN r.id END),0) as trending_score")
+            ])
+            ->leftJoin('books as b', 'authors.id', '=', 'b.author_id')
+            ->leftJoin('ratings as r', 'b.id', '=', 'r.book_id')
+            ->groupBy('authors.id', 'authors.name');
+
+        $query->addBinding([
+            $recentStart, 
+            $lastStart,   
+            $recentStart, 
+            $recentStart  
+        ], 'select');
+
+        if (!empty($keyword)) {
+            $query->where('authors.name', 'like', "%{$keyword}%");
+        }
+
+        switch ($sorting) {
+            case 'average_rating':
+                $query->orderByDesc('overall_avg_rating')
+                    ->orderByDesc('total_ratings_count');
+                break;
+            case 'trending':
+                $query->orderByDesc('trending_score')
+                    ->orderByDesc('overall_avg_rating');
+                break;
+            case 'popularity':
+            default:
+                $query->orderByDesc('popularity_count')
+                    ->orderByDesc('overall_avg_rating');
+                break;
+        }
+        $query->having('total_ratings_count', '>', 0);
+
+        return $query->limit(20);
     }
 
     public function getBooks($id)
     {
-        $author = Authors::with('books:id,title,author_id')->find($id);
+        $author = Authors::select('id', 'name')
+            ->with(['books' => function ($query) {
+                $query->select('id', 'title', 'author_id', 'isbn', 'year')
+                    ->orderBy('year', 'desc');
+            }])
+            ->find($id);
 
         if (!$author) {
-            return response()->json([], 404);
+            return response()->json(['message' => 'Author not found'], 404);
         }
 
-        return response()->json($author->books);
+        return response()->json([
+            'author' => $author->name,
+            'books' => $author->books
+        ]);
     }
 
     /**

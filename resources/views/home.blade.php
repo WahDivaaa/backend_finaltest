@@ -49,7 +49,7 @@
 
                 {{-- Year Range --}}
                 <div class="col">
-                    <label for="year">Tahun terbit</label>
+                    <label for="year">Tahun terbit (1950-2025)</label>
                     <div class="d-flex">
                         <input class="form-control me-2" type="number" name="year_min" placeholder="Min"
                             aria-label=".form-control example">
@@ -83,7 +83,7 @@
                 </div>
                 {{-- Rating --}}
                 <div class="col">
-                    <label for="year">Rating buku</label>
+                    <label for="year">Rating buku (1-10)</label>
                     <div class="d-flex">
                         <input class="form-control me-2" type="number" name="rating_min" placeholder="Min rating"
                             aria-label=".form-control example">
@@ -96,7 +96,7 @@
                 <div class="col-lg-3">
                     <label for="sorting">Sort By</label>
                     <select id="sorting" name="sorting" class="mt-0 btn btn-outline-secondary text-center w-100">
-                        <option value="weighted_rating" selected>Weighted average rating</option>
+                        <option class="text-start" value="weighted_rating">Weighted average rating</option>
                         <option class="text-start" value="total_votes">Total votes</option>
                         <option class="text-start" value="recent_popularity">Recent popularity (last 30 days)</option>
                         <option class="text-start" value="alphabetical">Alphabetical</option>
