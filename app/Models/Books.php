@@ -49,12 +49,10 @@ class Books extends Model
             ->selectRaw("COALESCE({$avgQuery}, 0) as ratings_avg_rate")
             ->selectRaw("COALESCE({$countQuery}, 0) as ratings_count")
             ->selectRaw(
-                // Kueri ini HANYA memiliki '?' untuk $m dan $C
                 "((COALESCE({$countQuery}, 0) / (COALESCE({$countQuery}, 0) + ?)) * COALESCE({$avgQuery}, 0)) + ((? / (COALESCE({$countQuery}, 0) + ?)) * ?) AS weighted_rating",
-                [$m, $m, $m, $C] // Bindings HANYA untuk $m dan $C
+                [$m, $m, $m, $C]
             )
             ->selectRaw(
-                // Kueri ini sekarang tidak memiliki '?' sama sekali
                 "CASE 
                     WHEN COALESCE({$recentAvgQuery}, 0) > COALESCE({$historicalAvgQuery}, 0) THEN 1 
                     WHEN COALESCE({$recentAvgQuery}, 0) < COALESCE({$historicalAvgQuery}, 0) THEN -1 
