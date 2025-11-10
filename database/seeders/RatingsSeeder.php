@@ -19,7 +19,7 @@ class RatingsSeeder extends Seeder
         DB::disableQueryLog();
         DB::statement('SET FOREIGN_KEY_CHECKS=0;');
 
-        $faker = Faker::create();
+        // $faker = Faker::create();
         $now = Carbon::now();
         $batchSize = 2000;
         $ratings = [];

@@ -23,7 +23,7 @@ class Books extends Model
 
     public function author()
     {
-        return $this->belongsTo(Authors::class, 'author_id');
+        return $this->belongsTo(Authors::class, 'author_id'); 
     }
 
     public function category()
@@ -41,7 +41,9 @@ class Books extends Model
         $sevenDaysAgo = now()->subDays(7)->toDateTimeString();
 
         $avgQuery = "(SELECT AVG(rate) FROM ratings WHERE ratings.book_id = books.id)";
+        // $avgQuery = Ratings::where('book_id')->avg('rate');
         $countQuery = "(SELECT COUNT(*) FROM ratings WHERE ratings.book_id = books.id)";
+        // $countQuery = Ratings::where('book_id')->count('rate');
         $recentAvgQuery = "(SELECT AVG(rate) FROM ratings WHERE ratings.book_id = books.id AND created_at >= '{$sevenDaysAgo}')";
         $historicalAvgQuery = "(SELECT AVG(rate) FROM ratings WHERE ratings.book_id = books.id AND created_at < '{$sevenDaysAgo}')";
 

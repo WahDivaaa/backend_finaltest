@@ -16,7 +16,7 @@ class AuthorsController extends Controller
         $keyword = $request->input('keyword');
 
         $cacheKey = 'authors_index_sort_' . $sorting . '_keyword_' . $keyword;
-        $cacheTTL = 600; // 10 menit
+        $cacheTTL = 600;
 
         $authors = Cache::remember($cacheKey, $cacheTTL, function () use ($sorting, $keyword) {
             return $this->getAuthorsQuery($sorting, $keyword)->get();
@@ -58,17 +58,14 @@ class AuthorsController extends Controller
 
         switch ($sorting) {
             case 'average_rating':
-                $query->orderByDesc('overall_avg_rating')
-                    ->orderByDesc('total_ratings_count');
+                $query->orderByDesc('overall_avg_rating') ;
                 break;
             case 'trending':
-                $query->orderByDesc('trending_score')
-                    ->orderByDesc('overall_avg_rating');
+                $query->orderByDesc('trending_score');
                 break;
             case 'popularity':
             default:
-                $query->orderByDesc('popularity_count')
-                    ->orderByDesc('overall_avg_rating');
+                $query->orderByDesc('popularity_count');
                 break;
         }
         $query->having('total_ratings_count', '>', 0);
@@ -76,24 +73,24 @@ class AuthorsController extends Controller
         return $query->limit(20);
     }
 
-    public function getBooks($id)
-    {
-        $author = Authors::select('id', 'name')
-            ->with(['books' => function ($query) {
-                $query->select('id', 'title', 'author_id', 'isbn', 'year')
-                    ->orderBy('year', 'desc');
-            }])
-            ->find($id);
+    // public function getBooks($id)
+    // {
+    //     $author = Authors::select('id', 'name')
+    //         ->with(['books' => function ($query) {
+    //             $query->select('id', 'title', 'author_id', 'isbn', 'year')
+    //                 ->orderBy('year', 'desc');
+    //         }])
+    //         ->find($id);
 
-        if (!$author) {
-            return response()->json(['message' => 'Author not found'], 404);
-        }
+    //     if (!$author) {
+    //         return response()->json(['message' => 'Author not found'], 404);
+    //     }
 
-        return response()->json([
-            'author' => $author->name,
-            'books' => $author->books
-        ]);
-    }
+    //     return response()->json([
+    //         'author' => $author->name,
+    //         'books' => $author->books
+    //     ]);
+    // }
 
     /**
      * Show the form for creating a new resource.
